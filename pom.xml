@@ -37,7 +37,7 @@
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-boot-starter</artifactId>
-            <version>${mybatis-plus.version}</version>
+            <version>3.5.5</version>
         </dependency>
 
         <!-- MySQL 驱动（使用 Spring Boot 管理的版本） -->
@@ -73,6 +73,12 @@
             <artifactId>commons-pool2</artifactId>
             <!-- 版本建议与 Spring Boot 2.3.x 兼容，通常 2.8.0 或 2.8.1 均可 -->
             <version>2.8.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-ui</artifactId>
+            <version>1.6.14</version>
         </dependency>
 
     </dependencies>

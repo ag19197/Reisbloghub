@@ -1,5 +1,7 @@
 package com.Reisblog.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -8,6 +10,7 @@ import lombok.Data;
 @Data
 @TableName("article_tag")
 public class ArticleTag {
+    @TableId(type = IdType.AUTO) // 主键自增
     private Long articleId;
     private Long tagId;
 }

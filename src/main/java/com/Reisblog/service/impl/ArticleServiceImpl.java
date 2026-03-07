@@ -2,34 +2,43 @@ package com.Reisblog.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.Reisblog.dto.PageResult;
+import com.Reisblog.dto.article.ArticleDetailDTO;
 import com.Reisblog.dto.article.ArticleListItemDTO;
 import com.Reisblog.entity.Article;
+import com.Reisblog.entity.ArticleTag;
 import com.Reisblog.entity.Category;
+import com.Reisblog.entity.Tag;
 import com.Reisblog.mapper.ArticleMapper;
+import com.Reisblog.mapper.ArticleTagMapper;
 import com.Reisblog.mapper.CategoryMapper;
 import com.Reisblog.mapper.TagMapper;
 import com.Reisblog.service.ArticleService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor //会为 final 字段生成构造器
 public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> implements ArticleService {
 
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
-    // 注意：如果需要联查文章标签，通常需要自定义Mapper SQL，这里为了简单，先略过标签查询
+    private final ArticleTagMapper articleTagMapper;  // 加上这个，稍后解释
+    private final StringRedisTemplate redisTemplate;   // 添加 RedisTemplate 注入
+    // TODO 注意：如果需要联查文章标签，通常需要自定义Mapper SQL，这里为了简单，先略过标签查询
 
+    // 文章列表
     @Override
     public PageResult<ArticleListItemDTO> getArticleList(int page, int size, Long categoryId, Long tagId, String keyword) {
         // 1. 构建查询条件（只查已发布）
@@ -74,4 +83,47 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
 
         return new PageResult<>(dtoList, articlePage.getTotal(), size, page);
     }
+
+    // 文章详情
+    @Override
+    public ArticleDetailDTO getArticleDetail(Long id, String ip) {
+        // 1. 查询文章
+        Article article = getById(id);
+        if (article == null) {
+            throw new RuntimeException("文章不存在");
+        }
+
+        // 2. 阅读数防刷（Redis）
+        String redisKey = "article:read:" + id + ":" + ip + ":" + LocalDate.now().toString();
+        Boolean isFirstRead = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", 1, TimeUnit.DAYS);
+        if (Boolean.TRUE.equals(isFirstRead)) {
+            // 当天首次访问，阅读数+1
+            article.setReadCount(article.getReadCount() + 1);
+            updateById(article); // 同步到数据库（或使用Redis异步累加）
+            // 可选：使用Redis incr 异步累加，定时同步到DB
+        }
+
+        // 3. 转换为 DTO
+        ArticleDetailDTO dto = BeanUtil.copyProperties(article, ArticleDetailDTO.class);
+
+        // 4. 设置分类名称
+        Category category = categoryMapper.selectById(article.getCategoryId());
+        dto.setCategoryName(category != null ? category.getName() : null);
+
+        // 5. 设置标签列表（需要联查）
+        List<String> tagNames = getTagNamesByArticleId(id);
+        dto.setTags(tagNames);
+
+        // 6. 设置是否已点赞（基于IP，预留）
+        // 待实现点赞功能后补充
+        dto.setHasLiked(false);
+
+        return dto;
+    }
+    // 辅助方法：查询文章的标签名列表
+    private List<String> getTagNamesByArticleId(Long articleId) {
+        // 直接调用自定义方法，无需再查 ArticleTag 实体
+        return articleTagMapper.selectTagNamesByArticleId(articleId);
+    }
+
 }

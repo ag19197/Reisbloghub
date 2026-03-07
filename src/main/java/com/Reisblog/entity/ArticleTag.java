@@ -10,7 +10,8 @@ import lombok.Data;
 @Data
 @TableName("article_tag")
 public class ArticleTag {
-    @TableId(type = IdType.AUTO) // 主键自增
+    @TableId(type = IdType.AUTO) // 如果表有自增 id
+    private Long id;
     private Long articleId;
     private Long tagId;
 }

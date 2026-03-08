@@ -32,3 +32,6 @@ mybatis-plus:
 logging:
   level:
     com.reisbloghub: debug                  # ??????????
+jwt:
+  secret: your-very-strong-secret-key-for-reisblog-at-least-32-bytes-long
+  expire: 604800   # 7天，单位秒

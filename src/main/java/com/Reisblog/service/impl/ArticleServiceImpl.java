@@ -4,10 +4,9 @@ import cn.hutool.core.bean.BeanUtil;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.article.ArticleDetailDTO;
 import com.Reisblog.dto.article.ArticleListItemDTO;
+import com.Reisblog.dto.like.LikeResultDTO;
 import com.Reisblog.entity.Article;
-import com.Reisblog.entity.ArticleTag;
 import com.Reisblog.entity.Category;
-import com.Reisblog.entity.Tag;
 import com.Reisblog.mapper.ArticleMapper;
 import com.Reisblog.mapper.ArticleTagMapper;
 import com.Reisblog.mapper.CategoryMapper;
@@ -19,7 +18,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +32,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
 
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
-    private final ArticleTagMapper articleTagMapper;  // 加上这个，稍后解释
+    private final ArticleTagMapper articleTagMapper;
     private final StringRedisTemplate redisTemplate;   // 添加 RedisTemplate 注入
     // TODO 注意：如果需要联查文章标签，通常需要自定义Mapper SQL，这里为了简单，先略过标签查询
 
@@ -120,6 +118,32 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
 
         return dto;
     }
+
+    @Override
+        public LikeResultDTO likeArticle(Long articleId, String ip) {
+        String likeKey = "article:like:" + articleId + ":" + ip + ":" + LocalDate.now().toString();
+
+        // 检查是否已点赞
+        Boolean isLiked = redisTemplate.hasKey(likeKey);
+
+        if (Boolean.TRUE.equals(isLiked)) {
+            // 已点赞，执行取消操作
+            redisTemplate.delete(likeKey);
+            // 文章点赞数 -1（使用 Redis 原子减，或直接操作数据库）
+            Article article = getById(articleId);
+            article.setLikeCount(article.getLikeCount() - 1);
+            updateById(article);
+            return new LikeResultDTO(article.getLikeCount(), "unlike");
+        } else {
+            // 未点赞，执行点赞操作
+            redisTemplate.opsForValue().set(likeKey, "1", 1, TimeUnit.DAYS);
+            Article article = getById(articleId);
+            article.setLikeCount(article.getLikeCount() + 1);
+            updateById(article);
+            return new LikeResultDTO(article.getLikeCount(), "like");
+        }
+    }
+
     // 辅助方法：查询文章的标签名列表
     private List<String> getTagNamesByArticleId(Long articleId) {
         // 直接调用自定义方法，无需再查 ArticleTag 实体

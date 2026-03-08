@@ -4,6 +4,7 @@ import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.Result;
 import com.Reisblog.dto.article.ArticleDetailDTO;
 import com.Reisblog.dto.article.ArticleListItemDTO;
+import com.Reisblog.dto.like.LikeResultDTO;
 import com.Reisblog.service.ArticleService;
 import com.Reisblog.utils.IpUtils;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,14 @@ public class ArticleController {
         String ip = IpUtils.getClientIp(request);
         ArticleDetailDTO detail = articleService.getArticleDetail(id, ip);
         return Result.success(detail);
+    }
+
+    @PostMapping("/{id}/like")
+    @Operation(summary = "点赞/取消点赞")
+    public Result<LikeResultDTO> likeArticle(@PathVariable Long id, HttpServletRequest request) {
+        String ip = IpUtils.getClientIp(request);
+        LikeResultDTO result = articleService.likeArticle(id, ip);
+        return Result.success(result);
     }
 
 }

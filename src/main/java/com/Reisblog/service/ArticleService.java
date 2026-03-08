@@ -3,6 +3,7 @@ package com.Reisblog.service;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.article.ArticleDetailDTO;
 import com.Reisblog.dto.article.ArticleListItemDTO;
+import com.Reisblog.dto.like.LikeResultDTO;
 import com.Reisblog.entity.Article;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -19,4 +20,6 @@ public interface ArticleService extends IService<Article> {
     PageResult<ArticleListItemDTO> getArticleList(int page, int size, Long categoryId, Long tagId, String keyword);
 
     ArticleDetailDTO getArticleDetail(Long id, String ip);
+
+    LikeResultDTO likeArticle(Long id, String ip);
 }

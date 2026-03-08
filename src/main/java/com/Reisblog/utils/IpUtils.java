@@ -4,6 +4,11 @@ import org.springframework.util.StringUtils;
 
 import javax.servlet.http.HttpServletRequest;
 
+// IP工具类
+/*
+*  是一个纯静态工具类，所有方法都是 public static
+*  它不需要依赖 Spring 容器中的任何 Bean
+* */
 public class IpUtils {
     /**
      * 获取客户端真实IP地址（考虑代理）

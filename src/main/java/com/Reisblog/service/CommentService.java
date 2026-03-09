@@ -1,15 +1,9 @@
 package com.Reisblog.service;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.comment.CommentDTO;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.Reisblog.dto.comment.CommentDTO;
 import com.Reisblog.entity.Comment;
-import com.baomidou.mybatisplus.extension.service.IService;
-
-import java.time.LocalDateTime;
-
 
 public interface CommentService extends IService<Comment> {
     /**

@@ -1,12 +1,16 @@
 package com.Reisblog.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.auth.LoginDTO;
 import com.Reisblog.dto.auth.RegisterDTO;
 import com.Reisblog.dto.auth.UserDTO;
+import com.Reisblog.dto.collection.PublicCollectionDTO;
+import com.Reisblog.dto.user.UserProfileDTO;
 import com.Reisblog.entity.User;
 import com.Reisblog.exception.BusinessException;
 import com.Reisblog.mapper.UserMapper;
+import com.Reisblog.service.CollectionService;
 import com.Reisblog.service.UserService;
 import com.Reisblog.utils.JwtUtils;
 import com.Reisblog.utils.PasswordEncoder;
@@ -21,6 +25,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+    private final CollectionService collectionService;
 
     @Override
     public UserDTO register(RegisterDTO dto) {
@@ -78,5 +83,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException("用户不存在");
         }
         return BeanUtil.copyProperties(user, UserDTO.class);
+    }
+
+    @Override
+    public UserProfileDTO getUserProfile(Long userId, int page, int size) {
+        // 1. 查询用户基本信息
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        // 2. 查询用户的公开收藏列表（调用 CollectionService）
+        PageResult<PublicCollectionDTO> publicCollections = collectionService.getPublicCollections(userId, page, size);
+        // 3. 组装 DTO
+        UserProfileDTO profile = new UserProfileDTO();
+        profile.setUserId(user.getId());
+        profile.setNickname(user.getNickname());
+        profile.setAvatar(user.getAvatar());
+        profile.setPublicCollections(publicCollections);
+        return profile;
     }
 }

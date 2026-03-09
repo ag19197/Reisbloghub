@@ -4,7 +4,9 @@ import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.Result;
 import com.Reisblog.dto.collection.CollectionDTO;
 import com.Reisblog.dto.collection.CollectionItemDTO;
+import com.Reisblog.dto.collection.PublicCollectionDTO;
 import com.Reisblog.service.CollectionService;
+import com.Reisblog.utils.JwtUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import javax.servlet.http.HttpServletRequest;
 public class CollectionController {
 
     private final CollectionService collectionService;
+    private final JwtUtils jwtUtils;
 
     /**
      * 从请求中获取当前登录用户的ID（由拦截器设置）
@@ -65,5 +68,14 @@ public class CollectionController {
         return Result.success(result);
     }
 
+    @GetMapping("/public/{userId}")
+    @Operation(summary = "获取指定用户的公开收藏列表")
+    public Result<PageResult<PublicCollectionDTO>> getPublicCollections(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PageResult<PublicCollectionDTO> result = collectionService.getPublicCollections(userId, page, size);
+        return Result.success(result);
+    }
 // 公开收藏列表接口（用于个人主页）放在另一个 Controller 或单独处理，这里暂不重复
 }

@@ -30,6 +30,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
     private final ArticleMapper articleMapper;
 
+    // 添加收藏
     @Override
     @Transactional
     public CollectionDTO addCollection(Long userId, Long articleId) {
@@ -54,14 +55,20 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         return BeanUtil.copyProperties(collection, CollectionDTO.class);
     }
 
+    // 移除收藏
     @Override
+    @Transactional
     public void removeCollection(Long userId, Long articleId) {
         LambdaQueryWrapper<Collection> wrapper = new LambdaQueryWrapper<Collection>()
                 .eq(Collection::getUserId, userId)
                 .eq(Collection::getArticleId, articleId);
-        this.remove(wrapper);
+        boolean removed = this.remove(wrapper);
+        if (!removed) {
+            throw new BusinessException("收藏不存在");
+        }
     }
 
+    // 更新收藏可见性
     @Override
     public void updateVisibility(Long userId, Long articleId, Boolean isPublic) {
         LambdaQueryWrapper<Collection> wrapper = new LambdaQueryWrapper<Collection>()
@@ -75,6 +82,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         this.updateById(collection);
     }
 
+    // 获取用户收藏
     @Override
     public PageResult<CollectionItemDTO> getUserCollections(Long userId, int page, int size, Boolean publicOnly) {
         LambdaQueryWrapper<Collection> wrapper = new LambdaQueryWrapper<Collection>()
@@ -96,6 +104,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         return new PageResult<>(dtoList, collectionPage.getTotal(), size, page);
     }
 
+    // 获取公开收藏
     @Override
     public PageResult<PublicCollectionDTO> getPublicCollections(Long userId, int page, int size) {
         LambdaQueryWrapper<Collection> wrapper = new LambdaQueryWrapper<Collection>()

@@ -24,7 +24,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/auth/**",              // 认证接口放行
                         "/users/profile/*",       // 获取公开个人主页（稍后说明）
-                        "/users/*/collections/public" // 公开收藏列表放行
+                        "/users/*/collections/public", // 公开收藏列表放行
+                        "/api/v1/collections/public/**",  // 公开收藏列表放行
+                        "/api/v1/users/profile/**"  // 获取公开个人主页
                 );
     }
 }

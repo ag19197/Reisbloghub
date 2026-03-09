@@ -1,0 +1,69 @@
+package com.Reisblog.controller;
+
+import com.Reisblog.dto.PageResult;
+import com.Reisblog.dto.Result;
+import com.Reisblog.dto.collection.CollectionDTO;
+import com.Reisblog.dto.collection.CollectionItemDTO;
+import com.Reisblog.service.CollectionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import javax.servlet.http.HttpServletRequest;
+
+@RestController
+@RequestMapping("/collections")
+@RequiredArgsConstructor
+@Tag(name = "收藏接口")
+public class CollectionController {
+
+    private final CollectionService collectionService;
+
+    /**
+     * 从请求中获取当前登录用户的ID（由拦截器设置）
+     */
+    private Long getCurrentUserId(HttpServletRequest request) {
+        return (Long) request.getAttribute("userId");
+    }
+
+    @PostMapping
+    @Operation(summary = "添加收藏")
+    public Result<CollectionDTO> addCollection(@RequestParam Long articleId, HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
+        CollectionDTO dto = collectionService.addCollection(userId, articleId);
+        return Result.success(dto);
+    }
+
+    @DeleteMapping("/{articleId}")
+    @Operation(summary = "取消收藏")
+    public Result<Void> removeCollection(@PathVariable Long articleId, HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
+        collectionService.removeCollection(userId, articleId);
+        return Result.success();
+    }
+
+    @PutMapping("/{articleId}")
+    @Operation(summary = "修改收藏可见性")
+    public Result<Void> updateVisibility(@PathVariable Long articleId,
+                                         @RequestParam Boolean isPublic,
+                                         HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
+        collectionService.updateVisibility(userId, articleId, isPublic);
+        return Result.success();
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "获取当前用户的收藏列表")
+    public Result<PageResult<CollectionItemDTO>> getUserCollections(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Boolean publicOnly,
+            HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
+        PageResult<CollectionItemDTO> result = collectionService.getUserCollections(userId, page, size, publicOnly);
+        return Result.success(result);
+    }
+
+// 公开收藏列表接口（用于个人主页）放在另一个 Controller 或单独处理，这里暂不重复
+}

@@ -5,9 +5,13 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
@@ -18,6 +22,11 @@ public class JwtUtils {
 
     @Value("${jwt.secret}")
     private String secret;
+
+    @PostConstruct
+    public void init() {
+        System.out.println("JWT secret (first 10 chars): " + secret.substring(0, Math.min(10, secret.length())));
+    }
 
     @Value("${jwt.expire}")
     private Long expire; // 过期时间，单位秒

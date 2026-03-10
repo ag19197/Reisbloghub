@@ -2,22 +2,28 @@ package com.Reisblog.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.Reisblog.dto.PageResult;
+import com.Reisblog.dto.article.AdminArticleDTO;
 import com.Reisblog.dto.article.ArticleDetailDTO;
 import com.Reisblog.dto.article.ArticleListItemDTO;
 import com.Reisblog.dto.like.LikeResultDTO;
 import com.Reisblog.entity.Article;
+import com.Reisblog.entity.ArticleTag;
 import com.Reisblog.entity.Category;
+import com.Reisblog.exception.BusinessException;
 import com.Reisblog.mapper.ArticleMapper;
 import com.Reisblog.mapper.ArticleTagMapper;
 import com.Reisblog.mapper.CategoryMapper;
 import com.Reisblog.mapper.TagMapper;
 import com.Reisblog.service.ArticleService;
+import com.Reisblog.utils.MarkdownUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -120,7 +126,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
 
     @Override
-        public LikeResultDTO likeArticle(Long articleId, String ip) {
+    public LikeResultDTO likeArticle(Long articleId, String ip) {
         String likeKey = "article:like:" + articleId + ":" + ip + ":" + LocalDate.now().toString();
 
         // 检查是否已点赞
@@ -142,6 +148,109 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
             updateById(article);
             return new LikeResultDTO(article.getLikeCount(), "like");
         }
+    }
+
+    @Override
+    public PageResult<AdminArticleDTO> getAdminArticles(int page, int size, Integer status, Long categoryId, String keyword) {
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(Article::getStatus, status);
+        }
+        if (categoryId != null) {
+            wrapper.eq(Article::getCategoryId, categoryId);
+        }
+        if (keyword != null && !keyword.isEmpty()) {
+            wrapper.like(Article::getTitle, keyword).or().like(Article::getSummary, keyword);
+        }
+        wrapper.orderByDesc(Article::getCreateTime);
+        Page<Article> articlePage = page(new Page<>(page, size), wrapper);
+        List<AdminArticleDTO> dtoList = articlePage.getRecords().stream()
+                .map(article -> BeanUtil.copyProperties(article, AdminArticleDTO.class))
+                .collect(Collectors.toList());
+        return new PageResult<>(dtoList, articlePage.getTotal(), size, page);
+    }
+
+    @Override
+    @Transactional
+    public Article saveArticle(Article article, List<Long> tagIds) {
+        // 1. 校验必填字段
+        if (article.getTitle() == null || article.getTitle().isEmpty()) {
+            throw new BusinessException("文章标题不能为空");
+        }
+        if (article.getContent() == null || article.getContent().isEmpty()) {
+            throw new BusinessException("文章内容不能为空");
+        }
+        // 2. 设置默认值
+        if (article.getStatus() == null) {
+            article.setStatus(0); // 默认为草稿
+        }
+        if (article.getAuthor() == null) {
+            article.setAuthor("admin"); // 默认作者
+        }
+        article.setReadCount(0);
+        article.setLikeCount(0);
+        article.setCommentCount(0);
+        article.setIsTop(0);
+
+        // 生成 HTML 内容
+        if (article.getContent() != null) {
+            // 如果引入 Markdown 解析器
+             article.setContentHtml(MarkdownUtils.render(article.getContent()));
+            // 临时方案：直接复制内容
+//            article.setContentHtml(article.getContent());
+        } else {
+            article.setContentHtml("");
+        }
+
+
+        // 3. 保存文章
+        this.save(article);
+
+        // 4. 保存文章-标签关联
+        if (tagIds != null && !tagIds.isEmpty()) {
+            for (Long tagId : tagIds) {
+                ArticleTag at = new ArticleTag();
+                at.setArticleId(article.getId());
+                at.setTagId(tagId);
+                articleTagMapper.insert(at);
+            }
+        }
+
+        return article;
+    }
+
+    @Override
+    @Transactional
+    public Article updateArticle(Article article, List<Long> tagIds) {
+        // 1. 检查文章是否存在
+        Article existing = this.getById(article.getId());
+        if (existing == null) {
+            throw new BusinessException("文章不存在");
+        }
+
+        // 如果传入了新的 content，重新生成 contentHtml
+        if (article.getContent() != null && !article.getContent().equals(existing.getContent())) {
+            //article.setContentHtml(article.getContent()); // 或使用 MarkdownUtils.render
+            article.setContentHtml(MarkdownUtils.render(article.getContent()));
+        }
+
+        // 2. 更新文章
+        this.updateById(article);
+
+        // 3. 更新标签：先删除原有关联，再插入新的
+        if (tagIds != null) {
+            // 先删除原有关联
+            articleTagMapper.deleteByArticleId(article.getId());
+            // 再插入新关联
+            for (Long tagId : tagIds) {
+                ArticleTag at = new ArticleTag();
+                at.setArticleId(article.getId());
+                at.setTagId(tagId);
+                articleTagMapper.insert(at);
+            }
+        }
+
+        return article;
     }
 
     // 辅助方法：查询文章的标签名列表

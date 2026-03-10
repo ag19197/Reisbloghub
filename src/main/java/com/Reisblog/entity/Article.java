@@ -1,6 +1,7 @@
 package com.Reisblog.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ public class Article {
     private Integer likeCount;
     private Integer commentCount;
     private Integer status;          // 0-草稿 1-已发布 2-定时发布
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime scheduledPublishTime;
     private Integer isTop;           // 0-否 1-是
     @TableField(fill = FieldFill.INSERT)

@@ -73,7 +73,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         // 3. 生成 JWT token
-        return jwtUtils.generateToken(user.getId());
+        return jwtUtils.generateToken(user.getId(), user.getRole());
     }
 
     @Override

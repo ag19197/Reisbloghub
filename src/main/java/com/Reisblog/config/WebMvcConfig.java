@@ -19,7 +19,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns(
                         "/collections/**",      // 收藏相关接口
                         "/users/profile",        // 修改个人信息（如果有）
-                        "/users/me"              // 获取当前用户信息（如果有）
+                        "/users/me",             // 获取当前用户信息（如果有）
+                        "/api/v1/admin/**"   // 必须添加
                 )
                 .excludePathPatterns(
                         "/auth/**",              // 认证接口放行

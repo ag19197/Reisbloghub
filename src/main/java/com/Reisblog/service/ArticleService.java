@@ -1,11 +1,14 @@
 package com.Reisblog.service;
 
 import com.Reisblog.dto.PageResult;
+import com.Reisblog.dto.article.AdminArticleDTO;
 import com.Reisblog.dto.article.ArticleDetailDTO;
 import com.Reisblog.dto.article.ArticleListItemDTO;
 import com.Reisblog.dto.like.LikeResultDTO;
 import com.Reisblog.entity.Article;
 import com.baomidou.mybatisplus.extension.service.IService;
+
+import java.util.List;
 
 public interface ArticleService extends IService<Article> {
     /**
@@ -22,4 +25,22 @@ public interface ArticleService extends IService<Article> {
     ArticleDetailDTO getArticleDetail(Long id, String ip);
 
     LikeResultDTO likeArticle(Long id, String ip);
+
+    PageResult<AdminArticleDTO> getAdminArticles(int page, int size, Integer status, Long categoryId, String keyword);
+
+    /**
+     * 新增文章
+     * @param article 文章实体（不含 ID）
+     * @param tagIds 标签 ID 列表
+     * @return 保存后的文章
+     */
+    Article saveArticle(Article article, List<Long> tagIds);
+
+    /**
+     * 更新文章
+     * @param article 文章实体（必须包含 ID）
+     * @param tagIds 标签 ID 列表
+     * @return 更新后的文章
+     */
+    Article updateArticle(Article article, List<Long> tagIds);
 }

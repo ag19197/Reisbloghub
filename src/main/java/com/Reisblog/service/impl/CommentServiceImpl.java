@@ -1,9 +1,12 @@
 package com.Reisblog.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.Reisblog.controller.admin.AdminCommentController;
 import com.Reisblog.dto.PageResult;
+import com.Reisblog.dto.comment.AdminCommentDTO;
 import com.Reisblog.dto.comment.CommentDTO;
 import com.Reisblog.entity.Comment;
+import com.Reisblog.exception.BusinessException;
 import com.Reisblog.mapper.CommentMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.Reisblog.service.CommentService;
@@ -64,18 +67,42 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
     }
 
     @Override
-    public PageResult<Comment> getAdminComments(int page, int size, Integer status, Long articleId) {
-        return null;
+    public PageResult<AdminCommentDTO> getAdminComments(int page, int size, Integer status, Long articleId) {
+        LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(Comment::getStatus, status);
+        }
+        if (articleId != null) {
+            wrapper.eq(Comment::getArticleId, articleId);
+        }
+        wrapper.orderByDesc(Comment::getCreateTime);
+        Page<Comment> commentPage = page(new Page<>(page, size), wrapper);
+        List<AdminCommentDTO> dtoList = commentPage.getRecords().stream()
+                .map(comment -> BeanUtil.copyProperties(comment, AdminCommentDTO.class))
+                .collect(Collectors.toList());
+        // 如果需要文章标题，可以在这里关联查询
+        return new PageResult<>(dtoList, commentPage.getTotal(), size, page);
     }
 
     @Override
     public void auditComment(Long commentId, Integer status) {
-
+        Comment comment = getById(commentId);
+        if (comment == null) {
+            throw new BusinessException("评论不存在");
+        }
+        comment.setStatus(status);
+        updateById(comment);
     }
 
     @Override
     public void deleteComment(Long commentId) {
-
+        // 逻辑删除：将状态设为3（管理员删除）
+        Comment comment = getById(commentId);
+        if (comment == null) {
+            throw new BusinessException("评论不存在");
+        }
+        comment.setStatus(3);
+        updateById(comment);
     }
 
     @Override

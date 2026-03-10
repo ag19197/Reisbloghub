@@ -20,6 +20,8 @@ spring:
         time-between-eviction-runs: 10s    # ??????
   jackson:
     default-property-inclusion: non_null    # JSON ?????? null ???
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
 
 mybatis-plus:
   type-aliases-package: com.Reisbloghub.entity   # ?????????

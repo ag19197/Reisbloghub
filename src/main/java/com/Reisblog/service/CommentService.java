@@ -1,6 +1,7 @@
 package com.Reisblog.service;
 
 import com.Reisblog.dto.PageResult;
+import com.Reisblog.dto.comment.AdminCommentDTO;
 import com.Reisblog.dto.comment.CommentDTO;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.Reisblog.entity.Comment;
@@ -19,7 +20,7 @@ public interface CommentService extends IService<Comment> {
     /**
      * 管理员获取评论列表（所有状态）
      */
-    PageResult<Comment> getAdminComments(int page, int size, Integer status, Long articleId);
+    PageResult<AdminCommentDTO> getAdminComments(int page, int size, Integer status, Long articleId);
 
     /**
      * 审核评论（修改状态）

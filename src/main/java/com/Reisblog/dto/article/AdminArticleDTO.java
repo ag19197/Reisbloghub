@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 // 后台文章列表项
 @Data
@@ -11,6 +12,9 @@ public class AdminArticleDTO {
     private Long id;
     private String title;
     private String summary;
+    private String content;
+    private Long categoryId;
+    private List<Long> tagIds;
     private String categoryName;
     private Integer readCount;
     private Integer likeCount;

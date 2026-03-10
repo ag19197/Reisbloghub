@@ -112,6 +112,12 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
+        <!--    commonmark    -->
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>0.21.0</version>
+        </dependency>
     </dependencies>
 
     <build>

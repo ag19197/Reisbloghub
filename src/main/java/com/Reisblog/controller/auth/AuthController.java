@@ -13,11 +13,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Tag(name = "认证接口")
 public class AuthController {
@@ -61,6 +62,19 @@ public class AuthController {
     public Result<String> login(@RequestBody LoginDTO dto) {
         String token = userService.login(dto);
         return Result.success(token);
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "获取当前登录用户信息")
+    public Result<UserDTO> getCurrentUser(HttpServletRequest request) {
+        // 从请求属性中获取 userId（由 JwtInterceptor 设置）
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.fail("未登录");
+        }
+        // 调用 service 获取用户信息（需要确保 UserService 中有该方法）
+        UserDTO userDTO = userService.getUserById(userId);
+        return Result.success(userDTO);
     }
 
     // 获取当前登录用户信息（需要 token，但这里暂时不加拦截器，先实现方法）

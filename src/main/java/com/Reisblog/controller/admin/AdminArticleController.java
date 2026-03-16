@@ -5,7 +5,9 @@ import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.Result;
 import com.Reisblog.dto.article.AdminArticleDTO;
 import com.Reisblog.entity.Article;
+import com.Reisblog.entity.Notification;
 import com.Reisblog.service.ArticleService;
+import com.Reisblog.service.NotificationService;
 import com.Reisblog.utils.AdminAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +23,7 @@ import javax.servlet.http.HttpServletRequest;
 public class AdminArticleController {
 
     private final ArticleService articleService;
+    private final NotificationService notificationService;
 
 
     @GetMapping
@@ -71,6 +74,17 @@ public class AdminArticleController {
         Article article = BeanUtil.copyProperties(dto, Article.class);
         article.setId(id);
         Article updated = articleService.updateArticle(article, dto.getTagIds());
+        // 在更新文章成功后，如果状态变为已发布（status=1），且原状态不是1，则发送通知
+        Article existing = articleService.getById(id);
+        if (existing != null && existing.getStatus() != 1 && dto.getStatus() == 1) {
+            Notification notification = new Notification();
+            notification.setUserId(existing.getUserId());
+            notification.setType("ARTICLE_PUBLISHED");
+            notification.setContent("你的文章《" + existing.getTitle() + "》已通过审核并发布！");
+            notification.setRelatedId(existing.getId());
+            notification.setIsRead(false);
+            notificationService.save(notification);
+        }
         return Result.success(updated);
     }
 

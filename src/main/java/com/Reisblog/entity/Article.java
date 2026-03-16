@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("article")
 public class Article {
+    private Long userId; // 作者用户ID
     @TableId(type = IdType.AUTO)
     private Long id;
     private String title;

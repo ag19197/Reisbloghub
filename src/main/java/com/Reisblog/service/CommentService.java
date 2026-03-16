@@ -10,7 +10,7 @@ public interface CommentService extends IService<Comment> {
     /**
      * 发表评论
      */
-    CommentDTO addComment(Comment comment);
+    CommentDTO addComment(Comment comment, Long userId);
 
     /**
      * 获取文章的评论列表（仅显示已通过）

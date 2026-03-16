@@ -7,16 +7,15 @@ import com.Reisblog.dto.article.AdminArticleDTO;
 import com.Reisblog.dto.article.ArticleDetailDTO;
 import com.Reisblog.dto.article.ArticleListItemDTO;
 import com.Reisblog.dto.like.LikeResultDTO;
-import com.Reisblog.entity.Article;
-import com.Reisblog.entity.ArticleTag;
-import com.Reisblog.entity.Category;
-import com.Reisblog.entity.User;
+import com.Reisblog.entity.*;
 import com.Reisblog.exception.BusinessException;
 import com.Reisblog.mapper.ArticleMapper;
 import com.Reisblog.mapper.ArticleTagMapper;
 import com.Reisblog.mapper.CategoryMapper;
 import com.Reisblog.mapper.TagMapper;
 import com.Reisblog.service.ArticleService;
+import com.Reisblog.service.NotificationService;
+import com.Reisblog.service.UserService;
 import com.Reisblog.utils.MarkdownUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -41,7 +40,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
     private final StringRedisTemplate redisTemplate;   // 添加 RedisTemplate 注入
-    private UserServiceImpl userService;
+    private final NotificationService notificationService;
+    private final UserService userService;
     // TODO 注意：如果需要联查文章标签，通常需要自定义Mapper SQL，这里为了简单，先略过标签查询
 
     // 文章列表
@@ -141,7 +141,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
 
     @Override
-    public LikeResultDTO likeArticle(Long articleId, String ip) {
+    public LikeResultDTO likeArticle(Long articleId, Long userId, String ip) {
         String likeKey = "article:like:" + articleId + ":" + ip + ":" + LocalDate.now().toString();
         Boolean isLiked = redisTemplate.hasKey(likeKey);
 
@@ -154,7 +154,6 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
             // 取消点赞
             redisTemplate.delete(likeKey);
             article.setLikeCount(article.getLikeCount() - 1);
-            // 排行榜分数减少（权重为 LIKE_WEIGHT）
             redisTemplate.opsForZSet().incrementScore(
                     RedisConstants.HOT_ARTICLE_ZSET,
                     articleId.toString(),
@@ -164,12 +163,23 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
             // 点赞
             redisTemplate.opsForValue().set(likeKey, "1", 1, TimeUnit.DAYS);
             article.setLikeCount(article.getLikeCount() + 1);
-            // 排行榜分数增加
             redisTemplate.opsForZSet().incrementScore(
                     RedisConstants.HOT_ARTICLE_ZSET,
                     articleId.toString(),
                     RedisConstants.LIKE_WEIGHT
             );
+            // 发送通知给文章作者（如果不是自己给自己点赞）
+            if (article.getUserId() != null && !article.getUserId().equals(userId)) {
+                User currentUser = userService.getById(userId);
+                String nickname = currentUser != null ? currentUser.getNickname() : "某用户";
+                Notification notification = new Notification();
+                notification.setUserId(article.getUserId());
+                notification.setType("LIKE");
+                notification.setContent("用户 " + nickname + " 点赞了你的文章：《" + article.getTitle() + "》");
+                notification.setRelatedId(articleId);
+                notification.setIsRead(false);
+                notificationService.save(notification);
+            }
         }
         updateById(article);
 

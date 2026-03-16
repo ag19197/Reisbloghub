@@ -24,7 +24,7 @@ public interface ArticleService extends IService<Article> {
 
     ArticleDetailDTO getArticleDetail(Long id, String ip);
 
-    LikeResultDTO likeArticle(Long id, String ip);
+    LikeResultDTO likeArticle(Long articleId, Long userId, String ip);
 
     PageResult<AdminArticleDTO> getAdminArticles(int page, int size, Integer status, Long categoryId, String keyword);
 

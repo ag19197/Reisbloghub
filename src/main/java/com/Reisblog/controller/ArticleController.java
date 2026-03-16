@@ -61,7 +61,11 @@ public class ArticleController {
     @Operation(summary = "点赞/取消点赞")
     public Result<LikeResultDTO> likeArticle(@PathVariable Long id, HttpServletRequest request) {
         String ip = IpUtils.getClientIp(request);
-        LikeResultDTO result = articleService.likeArticle(id, ip);
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.fail("未登录");
+        }
+        LikeResultDTO result = articleService.likeArticle(id, userId, ip);
         return Result.success(result);
     }
 

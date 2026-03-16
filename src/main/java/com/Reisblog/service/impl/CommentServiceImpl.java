@@ -1,21 +1,24 @@
 package com.Reisblog.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.Reisblog.controller.admin.AdminCommentController;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.comment.AdminCommentDTO;
 import com.Reisblog.dto.comment.CommentDTO;
+import com.Reisblog.entity.Article;
 import com.Reisblog.entity.Comment;
+import com.Reisblog.entity.Notification;
 import com.Reisblog.exception.BusinessException;
+import com.Reisblog.mapper.ArticleMapper;
 import com.Reisblog.mapper.CommentMapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.Reisblog.service.CommentService;
+import com.Reisblog.service.NotificationService;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -27,20 +30,31 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> implements CommentService {
+
+    private final ArticleMapper articleMapper;
+    private final NotificationService notificationService;
+
     //这个方法负责保存评论，并根据内容是否包含屏蔽词设置状态。
     @Override
-    public CommentDTO addComment(Comment comment) {
-        // 1. 设置默认值
+    public CommentDTO addComment(Comment comment, Long userId) {
         if (comment.getParentId() == null) {
-            comment.setParentId(0L);  // 0 表示一级评论
+            comment.setParentId(0L);
         }
-        // 2. 设置创建时间（也可以用 MyBatis-Plus 自动填充）
         comment.setCreateTime(LocalDateTime.now());
-
-        // 3. 保存到数据库
         save(comment);
 
-        // 4. 转换为 DTO 返回
+        // 获取文章作者ID并发送通知
+        Article article = articleMapper.selectById(comment.getArticleId());
+        if (article != null && article.getUserId() != null && !article.getUserId().equals(userId)) {
+            Notification notification = new Notification();
+            notification.setUserId(article.getUserId());
+            notification.setType("COMMENT");
+            notification.setContent("用户 " + comment.getNickname() + " 评论了你的文章：《" + article.getTitle() + "》");
+            notification.setRelatedId(article.getId());
+            notification.setIsRead(false);
+            notificationService.save(notification);
+        }
+
         return BeanUtil.copyProperties(comment, CommentDTO.class);
     }
 

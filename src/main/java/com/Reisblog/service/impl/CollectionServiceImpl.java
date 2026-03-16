@@ -7,10 +7,14 @@ import com.Reisblog.dto.collection.CollectionItemDTO;
 import com.Reisblog.dto.collection.PublicCollectionDTO;
 import com.Reisblog.entity.Article;
 import com.Reisblog.entity.Collection;
+import com.Reisblog.entity.Notification;
+import com.Reisblog.entity.User;
 import com.Reisblog.exception.BusinessException;
 import com.Reisblog.mapper.ArticleMapper;
 import com.Reisblog.mapper.CollectionMapper;
+import com.Reisblog.mapper.UserMapper;
 import com.Reisblog.service.CollectionService;
+import com.Reisblog.service.NotificationService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -28,6 +32,8 @@ import java.util.stream.Collectors;
 public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collection> implements CollectionService {
 
     private final ArticleMapper articleMapper;
+    private final NotificationService notificationService;
+    private final UserMapper userMapper;
 
     // 添加收藏
     @Override
@@ -55,6 +61,20 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         collection.setArticleId(articleId);
         collection.setIsPublic(0); // 私密
         this.save(collection);
+
+        // 发送通知给文章作者
+        if (article.getUserId() != null && !article.getUserId().equals(userId)) {
+            // 通过 userMapper 获取当前用户的昵称
+            User currentUser = userMapper.selectById(userId);
+            String nickname = currentUser != null ? currentUser.getNickname() : "某用户";
+            Notification notification = new Notification();
+            notification.setUserId(article.getUserId());
+            notification.setType("COLLECT");
+            notification.setContent("用户 " + nickname + " 收藏了你的文章：《" + article.getTitle() + "》");
+            notification.setRelatedId(articleId);
+            notification.setIsRead(false);
+            notificationService.save(notification);
+        }
         return BeanUtil.copyProperties(collection, CollectionDTO.class);
     }
 

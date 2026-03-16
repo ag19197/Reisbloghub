@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
+
 @RestController
 @RequestMapping("/api/v1/comments")
 @RequiredArgsConstructor
@@ -21,7 +23,8 @@ public class CommentController {
 
     @PostMapping
     @Operation(summary = "发表评论")
-    public Result<CommentDTO> addComment(@RequestBody Comment comment) {
+    public Result<CommentDTO> addComment(@RequestBody Comment comment, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
         // 1. 校验必要字段
         if (comment.getArticleId() == null || comment.getNickname() == null || comment.getContent() == null) {
             return Result.fail("文章ID、昵称、内容不能为空");
@@ -34,7 +37,7 @@ public class CommentController {
             comment.setStatus(0); // 待审核
         }
         // 3. 保存评论
-        CommentDTO saved = commentService.addComment(comment);
+        CommentDTO saved = commentService.addComment(comment, userId);
         return Result.success(saved);
     }
 

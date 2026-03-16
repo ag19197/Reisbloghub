@@ -19,6 +19,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns(
                         "/api/v1/collections/**",      // 收藏相关接口
                         "/api/v1/admin/**",             // 后台管理接口
+                        "/api/v1/notifications/**",
                         "/api/v1/auth/me"
                 )
                 .excludePathPatterns(

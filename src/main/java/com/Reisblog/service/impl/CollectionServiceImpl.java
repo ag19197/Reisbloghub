@@ -16,7 +16,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +33,10 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
     @Override
     @Transactional
     public CollectionDTO addCollection(Long userId, Long articleId) {
+        // 检查是否已收藏
+        if (isCollected(userId, articleId)) {
+            throw new BusinessException("已经收藏过了");
+        }
         // 1. 检查文章是否存在
         Article article = articleMapper.selectById(articleId);
         if (article == null) {
@@ -125,4 +128,13 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         }).collect(Collectors.toList());
         return new PageResult<>(dtoList, collectionPage.getTotal(), size, page);
     }
+
+    @Override
+    public boolean isCollected(Long userId, Long articleId) {
+        LambdaQueryWrapper<Collection> wrapper = new LambdaQueryWrapper<Collection>()
+                .eq(Collection::getUserId, userId)
+                .eq(Collection::getArticleId, articleId);
+        return this.count(wrapper) > 0;
+    }
+
 }

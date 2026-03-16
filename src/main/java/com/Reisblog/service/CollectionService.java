@@ -49,4 +49,6 @@ public interface CollectionService extends IService<Collection> {
      * @return 分页结果
      */
     PageResult<PublicCollectionDTO> getPublicCollections(Long userId, int page, int size);
+
+    boolean isCollected(Long userId, Long articleId);
 }

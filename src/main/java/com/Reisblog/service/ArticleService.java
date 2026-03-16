@@ -43,4 +43,12 @@ public interface ArticleService extends IService<Article> {
      * @return 更新后的文章
      */
     Article updateArticle(Article article, List<Long> tagIds);
+
+    void updateHotScore(Long articleId);
+
+    List<Article> getHotArticles(int topN);
+
+    void initHotRanking();
+
+    PageResult<ArticleListItemDTO> getUserArticles(Long userId, int page, int size);
 }

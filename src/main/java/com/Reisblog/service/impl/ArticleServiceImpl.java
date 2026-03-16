@@ -1,6 +1,7 @@
 package com.Reisblog.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.Reisblog.constant.RedisConstants;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.article.AdminArticleDTO;
 import com.Reisblog.dto.article.ArticleDetailDTO;
@@ -9,6 +10,7 @@ import com.Reisblog.dto.like.LikeResultDTO;
 import com.Reisblog.entity.Article;
 import com.Reisblog.entity.ArticleTag;
 import com.Reisblog.entity.Category;
+import com.Reisblog.entity.User;
 import com.Reisblog.exception.BusinessException;
 import com.Reisblog.mapper.ArticleMapper;
 import com.Reisblog.mapper.ArticleTagMapper;
@@ -25,12 +27,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static com.Reisblog.constant.RedisConstants.HOT_ARTICLES_KEY;
 
 @Service
 @RequiredArgsConstructor //会为 final 字段生成构造器
@@ -40,6 +41,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
     private final StringRedisTemplate redisTemplate;   // 添加 RedisTemplate 注入
+    private UserServiceImpl userService;
     // TODO 注意：如果需要联查文章标签，通常需要自定义Mapper SQL，这里为了简单，先略过标签查询
 
     // 文章列表
@@ -107,6 +109,17 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
             // 可选：使用Redis incr 异步累加，定时同步到DB
         }
 
+        if (Boolean.TRUE.equals(isFirstRead)) {
+            article.setReadCount(article.getReadCount() + 1);
+            updateById(article);
+            // 阅读数增加，排行榜增加 READ_WEIGHT
+            redisTemplate.opsForZSet().incrementScore(
+                    RedisConstants.HOT_ARTICLE_ZSET,
+                    id.toString(),
+                    RedisConstants.READ_WEIGHT
+            );
+        }
+
         // 3. 转换为 DTO
         ArticleDetailDTO dto = BeanUtil.copyProperties(article, ArticleDetailDTO.class);
 
@@ -119,8 +132,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         dto.setTags(tagNames);
 
         // 6. 设置是否已点赞（基于IP，预留）
-        // 待实现点赞功能后补充
-        dto.setHasLiked(false);
+        // 判断当前IP是否已点赞
+        String likeKey = "article:like:" + id + ":" + ip + ":" + LocalDate.now().toString();
+        Boolean liked = redisTemplate.hasKey(likeKey);
+        dto.setHasLiked(Boolean.TRUE.equals(liked));
 
         return dto;
     }
@@ -128,26 +143,37 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     @Override
     public LikeResultDTO likeArticle(Long articleId, String ip) {
         String likeKey = "article:like:" + articleId + ":" + ip + ":" + LocalDate.now().toString();
-
-        // 检查是否已点赞
         Boolean isLiked = redisTemplate.hasKey(likeKey);
 
-        if (Boolean.TRUE.equals(isLiked)) {
-            // 已点赞，执行取消操作
-            redisTemplate.delete(likeKey);
-            // 文章点赞数 -1（使用 Redis 原子减，或直接操作数据库）
-            Article article = getById(articleId);
-            article.setLikeCount(article.getLikeCount() - 1);
-            updateById(article);
-            return new LikeResultDTO(article.getLikeCount(), "unlike");
-        } else {
-            // 未点赞，执行点赞操作
-            redisTemplate.opsForValue().set(likeKey, "1", 1, TimeUnit.DAYS);
-            Article article = getById(articleId);
-            article.setLikeCount(article.getLikeCount() + 1);
-            updateById(article);
-            return new LikeResultDTO(article.getLikeCount(), "like");
+        Article article = getById(articleId);
+        if (article == null) {
+            throw new BusinessException("文章不存在");
         }
+
+        if (Boolean.TRUE.equals(isLiked)) {
+            // 取消点赞
+            redisTemplate.delete(likeKey);
+            article.setLikeCount(article.getLikeCount() - 1);
+            // 排行榜分数减少（权重为 LIKE_WEIGHT）
+            redisTemplate.opsForZSet().incrementScore(
+                    RedisConstants.HOT_ARTICLE_ZSET,
+                    articleId.toString(),
+                    -RedisConstants.LIKE_WEIGHT
+            );
+        } else {
+            // 点赞
+            redisTemplate.opsForValue().set(likeKey, "1", 1, TimeUnit.DAYS);
+            article.setLikeCount(article.getLikeCount() + 1);
+            // 排行榜分数增加
+            redisTemplate.opsForZSet().incrementScore(
+                    RedisConstants.HOT_ARTICLE_ZSET,
+                    articleId.toString(),
+                    RedisConstants.LIKE_WEIGHT
+            );
+        }
+        updateById(article);
+
+        return new LikeResultDTO(article.getLikeCount(), isLiked ? "unlike" : "like");
     }
 
     @Override
@@ -251,6 +277,124 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         }
 
         return article;
+    }
+
+    @Override
+    public void updateHotScore(Long articleId) {
+        Article article = getById(articleId);
+        if (article == null) return;
+        // 计算得分：阅读数权重1，点赞数权重2（可调整）
+        double score = article.getReadCount() * 1.0 + article.getLikeCount() * 2.0;
+        redisTemplate.opsForZSet().add(HOT_ARTICLES_KEY, String.valueOf(articleId), score);
+    }
+
+    @Override
+    public List<Article> getHotArticles(int top) {
+        // 1. 尝试从 Redis 获取热门文章 ID
+        Set<String> hotIds = redisTemplate.opsForZSet().reverseRange(RedisConstants.HOT_ARTICLE_ZSET, 0, top - 1);
+        if (hotIds != null && !hotIds.isEmpty()) {
+            // Redis 有数据，根据 ID 查询文章并保持顺序
+            List<Long> idList = hotIds.stream().map(Long::valueOf).collect(Collectors.toList());
+            List<Article> articles = listByIds(idList);
+            Map<Long, Article> articleMap = articles.stream()
+                    .collect(Collectors.toMap(Article::getId, a -> a));
+            return idList.stream()
+                    .map(articleMap::get)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
+
+        // 2. Redis 无数据，从数据库获取所有已发布文章
+        List<Article> allArticles = list(); // 获取所有文章（包括草稿）
+        List<Article> published = allArticles.stream()
+                .filter(a -> a.getStatus() != null && a.getStatus() == 1) // 只取已发布
+                .collect(Collectors.toList());
+
+        if (published.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 3. 按热度计算分数并排序（点赞权重3，阅读权重1）
+        published.sort((a, b) -> {
+            double scoreA = a.getLikeCount() * RedisConstants.LIKE_WEIGHT
+                    + a.getReadCount() * RedisConstants.READ_WEIGHT;
+            double scoreB = b.getLikeCount() * RedisConstants.LIKE_WEIGHT
+                    + b.getReadCount() * RedisConstants.READ_WEIGHT;
+            return Double.compare(scoreB, scoreA);
+        });
+
+        // 4. 取前 top 篇
+        List<Article> topArticles = published.stream().limit(top).collect(Collectors.toList());
+
+        // 5. 将这批文章写入 Redis，方便下次快速获取
+        for (Article article : topArticles) {
+            double score = article.getLikeCount() * RedisConstants.LIKE_WEIGHT
+                    + article.getReadCount() * RedisConstants.READ_WEIGHT;
+            redisTemplate.opsForZSet().add(RedisConstants.HOT_ARTICLE_ZSET,
+                    article.getId().toString(), score);
+        }
+
+        System.out.println("尝试从 Redis 获取热门文章，结果: " + hotIds);
+        if (hotIds == null || hotIds.isEmpty()) {
+            System.out.println("Redis 无数据，将从数据库加载");
+        }
+
+        return topArticles;
+    }
+
+    @Override
+    public void initHotRanking() {
+        // 查询所有文章（可根据需要只查询已发布的文章）
+        List<Article> articles = list();
+        if (articles.isEmpty()) {
+            return;
+        }
+        // 清除旧的排行榜数据（可选）
+        redisTemplate.delete(RedisConstants.HOT_ARTICLE_ZSET);
+        // 批量添加分数
+        for (Article article : articles) {
+            double score = article.getLikeCount() * RedisConstants.LIKE_WEIGHT
+                    + article.getReadCount() * RedisConstants.READ_WEIGHT;
+            redisTemplate.opsForZSet().add(
+                    RedisConstants.HOT_ARTICLE_ZSET,
+                    article.getId().toString(),
+                    score
+            );
+        }
+    }
+
+    @Override
+    public PageResult<ArticleListItemDTO> getUserArticles(Long userId, int page, int size) {
+        // 1. 根据用户ID获取用户信息，得到昵称
+        User user = userService.getById(userId);  // 需要注入 UserService
+        if (user == null) {
+            return new PageResult<>(new ArrayList<>(), 0, size, page);
+        }
+
+        // 2. 查询该用户发布的文章（按作者昵称）
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<Article>()
+                .eq(Article::getAuthor, user.getNickname()) // 假设用作者昵称关联
+                .orderByDesc(Article::getCreateTime);
+        Page<Article> articlePage = page(new Page<>(page, size), wrapper);
+
+        // 3. 转换为 DTO（可复用已有转换逻辑，建议提取公共方法）
+        List<ArticleListItemDTO> dtoList = articlePage.getRecords().stream()
+                .map(this::convertToListItemDTO) // 假设你有一个转换方法
+                .collect(Collectors.toList());
+
+        return new PageResult<>(dtoList, articlePage.getTotal(), size, page);
+    }
+
+    // 可以提取一个私有方法，从 Article 转换为 ArticleListItemDTO
+    private ArticleListItemDTO convertToListItemDTO(Article article) {
+        ArticleListItemDTO dto = BeanUtil.copyProperties(article, ArticleListItemDTO.class);
+        // 设置分类名称（需要 CategoryMapper）
+        Category category = categoryMapper.selectById(article.getCategoryId());
+        dto.setCategoryName(category != null ? category.getName() : null);
+        // 设置标签列表（需要 ArticleTagMapper）
+        List<String> tagNames = articleTagMapper.selectTagNamesByArticleId(article.getId());
+        dto.setTags(tagNames);
+        return dto;
     }
 
     // 辅助方法：查询文章的标签名列表

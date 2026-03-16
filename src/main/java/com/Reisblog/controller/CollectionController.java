@@ -1,5 +1,6 @@
 package com.Reisblog.controller;
 
+import com.Reisblog.dto.ArticleIdDTO;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.Result;
 import com.Reisblog.dto.collection.CollectionDTO;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 
 @RestController
-@RequestMapping("/collections")
+@RequestMapping("/api/v1/collections")
 @RequiredArgsConstructor
 @Tag(name = "收藏接口")
 public class CollectionController {
@@ -32,10 +33,10 @@ public class CollectionController {
 
     @PostMapping
     @Operation(summary = "添加收藏")
-    public Result<CollectionDTO> addCollection(@RequestParam Long articleId, HttpServletRequest request) {
+    public Result<CollectionDTO> addCollection(@RequestBody ArticleIdDTO dto, HttpServletRequest request) {
         Long userId = getCurrentUserId(request);
-        CollectionDTO dto = collectionService.addCollection(userId, articleId);
-        return Result.success(dto);
+        CollectionDTO result = collectionService.addCollection(userId, dto.getArticleId());
+        return Result.success(result);
     }
 
     @DeleteMapping("/{articleId}")
@@ -77,5 +78,14 @@ public class CollectionController {
         PageResult<PublicCollectionDTO> result = collectionService.getPublicCollections(userId, page, size);
         return Result.success(result);
     }
+
+    @GetMapping("/status/{articleId}")
+    @Operation(summary = "查询当前用户是否已收藏指定文章")
+    public Result<Boolean> getCollectionStatus(@PathVariable Long articleId, HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
+        boolean collected = collectionService.isCollected(userId, articleId);
+        return Result.success(collected);
+    }
+
 // 公开收藏列表接口（用于个人主页）放在另一个 Controller 或单独处理，这里暂不重复
 }

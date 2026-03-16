@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 @Tag(name = "用户主页接口")
 public class UserProfileController {

@@ -1,5 +1,6 @@
 package com.Reisblog.controller.admin;
 
+import com.Reisblog.dto.CommentAuditDTO;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.Result;
 import com.Reisblog.dto.comment.AdminCommentDTO;
@@ -35,9 +36,9 @@ public class AdminCommentController {
 
     @PutMapping("/{id}/status")
     @Operation(summary = "审核评论")
-    public Result<Void> auditComment(@PathVariable Long id, @RequestParam Integer status, HttpServletRequest request) {
+    public Result<Void> auditComment(@PathVariable Long id, @RequestBody CommentAuditDTO dto, HttpServletRequest request) {
         AdminAuthUtil.getAdminId(request);
-        commentService.auditComment(id, status);
+        commentService.auditComment(id, dto.getStatus());
         return Result.success();
     }
 

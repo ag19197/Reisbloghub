@@ -1,8 +1,6 @@
 package com.Reisblog.interceptor;
 
 import com.Reisblog.utils.JwtUtils;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,27 +20,34 @@ public class JwtInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // 如果是 OPTIONS 请求，直接放行（不验证 token）
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+        String uri = request.getRequestURI();
+        System.out.println("========== JwtInterceptor ==========");
+        System.out.println("请求路径: " + uri);
         String authHeader = request.getHeader("Authorization");
+        System.out.println("Authorization头: " + authHeader);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new RuntimeException("未登录");
+            // 没有 token，返回 401 错误
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"未登录\",\"data\":null}");
+            return false;
         }
         String token = authHeader.substring(7);
-        Claims claims;
-        try {
-            claims = Jwts.parser()
-                    .verifyWith(jwtUtils.getSigningKey())
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        } catch (Exception e) {
-            throw new RuntimeException("token无效");
+        if (!jwtUtils.validateToken(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"token无效\",\"data\":null}");
+            return false;
         }
-        Long userId = Long.parseLong(claims.getSubject());
-        String role = claims.get("role", String.class);
+        Long userId = jwtUtils.getUserIdFromToken(token);
+        String role = jwtUtils.getRoleFromToken(token);
+        System.out.println("解析 userId: " + userId + ", role: " + role);
         request.setAttribute("userId", userId);
         request.setAttribute("userRole", role);
-
-        System.out.println("解析到的角色: " + role);
         return true;
     }
 }

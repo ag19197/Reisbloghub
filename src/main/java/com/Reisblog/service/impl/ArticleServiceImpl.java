@@ -96,7 +96,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         // 1. 查询文章
         Article article = getById(id);
         if (article == null) {
-            throw new RuntimeException("文章不存在");
+            throw new BusinessException("文章不存在");
         }
 
         // 2. 阅读数防刷（Redis）
@@ -104,12 +104,6 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         Boolean isFirstRead = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", 1, TimeUnit.DAYS);
         if (Boolean.TRUE.equals(isFirstRead)) {
             // 当天首次访问，阅读数+1
-            article.setReadCount(article.getReadCount() + 1);
-            updateById(article); // 同步到数据库（或使用Redis异步累加）
-            // 可选：使用Redis incr 异步累加，定时同步到DB
-        }
-
-        if (Boolean.TRUE.equals(isFirstRead)) {
             article.setReadCount(article.getReadCount() + 1);
             updateById(article);
             // 阅读数增加，排行榜增加 READ_WEIGHT
@@ -127,12 +121,28 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         Category category = categoryMapper.selectById(article.getCategoryId());
         dto.setCategoryName(category != null ? category.getName() : null);
 
-        // 5. 设置标签列表（需要联查）
+        // 5. 设置标签列表
         List<String> tagNames = getTagNamesByArticleId(id);
         dto.setTags(tagNames);
 
-        // 6. 设置是否已点赞（基于IP，预留）
-        // 判断当前IP是否已点赞
+        // 6. 设置作者信息（优先从 user 表获取最新）
+        if (article.getUserId() != null) {
+            dto.setAuthorId(article.getUserId());
+            User user = userService.getById(article.getUserId());
+            if (user != null) {
+                dto.setAuthorName(user.getNickname());
+                dto.setAuthorAvatar(user.getAvatar());
+            } else {
+                dto.setAuthorName(article.getAuthor());
+                dto.setAuthorAvatar(null);
+            }
+        } else {
+            dto.setAuthorId(null);
+            dto.setAuthorName(article.getAuthor());
+            dto.setAuthorAvatar(null);
+        }
+
+        // 7. 设置是否已点赞
         String likeKey = "article:like:" + id + ":" + ip + ":" + LocalDate.now().toString();
         Boolean liked = redisTemplate.hasKey(likeKey);
         dto.setHasLiked(Boolean.TRUE.equals(liked));
@@ -270,6 +280,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
             article.setContentHtml(MarkdownUtils.render(article.getContent()));
         }
 
+
         // 2. 更新文章
         this.updateById(article);
 
@@ -392,6 +403,19 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
                 .map(this::convertToListItemDTO) // 假设你有一个转换方法
                 .collect(Collectors.toList());
 
+        return new PageResult<>(dtoList, articlePage.getTotal(), size, page);
+    }
+
+    @Override
+    public PageResult<ArticleListItemDTO> getUserPublicArticles(Long userId, int page, int size) {
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<Article>()
+                .eq(Article::getUserId, userId)
+                .eq(Article::getStatus, 1)
+                .orderByDesc(Article::getCreateTime);
+        Page<Article> articlePage = page(new Page<>(page, size), wrapper);
+        List<ArticleListItemDTO> dtoList = articlePage.getRecords().stream()
+                .map(this::convertToListItemDTO)
+                .collect(Collectors.toList());
         return new PageResult<>(dtoList, articlePage.getTotal(), size, page);
     }
 

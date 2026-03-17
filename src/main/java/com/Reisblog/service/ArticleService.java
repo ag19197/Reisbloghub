@@ -51,4 +51,6 @@ public interface ArticleService extends IService<Article> {
     void initHotRanking();
 
     PageResult<ArticleListItemDTO> getUserArticles(Long userId, int page, int size);
+
+    PageResult<ArticleListItemDTO> getUserPublicArticles(Long userId, int page, int size);
 }

@@ -3,6 +3,7 @@ package com.Reisblog.controller;
 import com.Reisblog.dto.ArticleIdDTO;
 import com.Reisblog.dto.PageResult;
 import com.Reisblog.dto.Result;
+import com.Reisblog.dto.UpdateVisibilityDTO;
 import com.Reisblog.dto.collection.CollectionDTO;
 import com.Reisblog.dto.collection.CollectionItemDTO;
 import com.Reisblog.dto.collection.PublicCollectionDTO;
@@ -50,10 +51,10 @@ public class CollectionController {
     @PutMapping("/{articleId}")
     @Operation(summary = "修改收藏可见性")
     public Result<Void> updateVisibility(@PathVariable Long articleId,
-                                         @RequestParam Boolean isPublic,
+                                         @RequestBody UpdateVisibilityDTO dto,
                                          HttpServletRequest request) {
         Long userId = getCurrentUserId(request);
-        collectionService.updateVisibility(userId, articleId, isPublic);
+        collectionService.updateVisibility(userId, articleId, dto.getIsPublic());
         return Result.success();
     }
 

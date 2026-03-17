@@ -114,4 +114,14 @@ public class ArticleController {
         return Result.success(result);
     }
 
+    @GetMapping("/user/{userId}")
+    @Operation(summary = "获取指定用户发布的文章列表")
+    public Result<PageResult<ArticleListItemDTO>> getUserPublicArticles(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PageResult<ArticleListItemDTO> result = articleService.getUserPublicArticles(userId, page, size);
+        return Result.success(result);
+    }
+
 }

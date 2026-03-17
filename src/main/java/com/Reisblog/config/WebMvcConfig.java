@@ -30,8 +30,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/v1/tags",
                         "/api/v1/comments/article/**",
                         "/api/v1/collections/public/**",
+                        "/api/v1/articles/*",
                         "/api/v1/articles",
-                        "/api/v1/users/profile/**"
+                        "/api/v1/users/profile/**",
+                        "/api/v1/users/{userId}",        // 新增：公开用户信息
+                        "/api/v1/articles/user/**"       // 新增：用户公开文章列表
                 );
     }
 }
